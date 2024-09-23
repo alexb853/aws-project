@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert
+    kompose.version: 1.21.0 (992df58d8)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: app
+  name: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: app
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: /snap/kompose/19/kompose-linux-amd64 convert
+        kompose.version: 1.21.0 (992df58d8)
+      creationTimestamp: null
+      labels:
+        io.kompose.network/my_network: "true"
+        io.kompose.service: app
+    spec:
+      containers:
+      - image: alexb853/python-app-image:v1.0.0-156-20240714-184459
+        imagePullPolicy: ""
+        name: app
+        volumeMounts:
+          - name: secret-volume
+            mountPath: "/etc/secrets"
+            readOnly: true
+        ports:
+        - containerPort: 5000
+        resources: {}
+      serviceAccountName: ""
+      volumes:
+          - name: secret-volume
+            secret:
+              secretName: api-key-secret
+status: {}
