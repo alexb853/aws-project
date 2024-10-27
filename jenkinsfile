@@ -32,7 +32,7 @@ pipeline {
               apiVersion: v1
               kind: Pod
               metadata:
-                namespace: jenkins
+                namespace: alexb-jenkins
               spec:
                 containers:
                 - name: jenkins-agent
