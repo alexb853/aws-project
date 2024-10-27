@@ -13,8 +13,12 @@ pipeline {
     DOCKER_COMPOSE_FILE = 'docker-compose.yml'
     BUILD_DATE = new Date().format('yyyyMMdd-HHmmss')
     IMAGE_TAG = "v1.0-${BUILD_NUMBER}-${BUILD_DATE}"
+    AWS_ACCOUNT_ID = 'YOUR_AWS_ACCOUNT_ID'
+    AWS_REGION = 'YOUR_AWS_REGION'
+    ECR_REPOSITORY_APP = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/python-app-repo"
+    ECR_REPOSITORY_WEB = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/web-app-repo"
     GIT_CREDENTIALS_ID = 'github'
-    DOCKERHUB_CREDENTIALS = 'dockerhub'
+    AWS_CREDENTIALS_ID = 'aws-ecr-credentials'  // Assuming you have configured AWS credentials in Jenkins
   }
 
   options {
@@ -72,14 +76,13 @@ pipeline {
       }
     }
 
-    stage('Check Commit') {
+    stage('Authenticate to AWS ECR') {
       steps {
-        script {
-          def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
-          if (commitMessage.contains('[ci skip]')) {
-            autoCancelled = true
-            echo 'This is an automated commit. Skipping build.'
-            currentBuild.result = 'SUCCESS'
+        container('docker') {
+          withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
+            sh '''
+              aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+            '''
           }
         }
       }
@@ -98,38 +101,23 @@ pipeline {
       }
     }
 
-    stage('Login to Docker Hub') {
+    stage('Tag and Push To ECR') {
       when {
         expression { !autoCancelled }
       }
       steps {
         container('docker') {
-          withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-            sh '''
-              echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
-            '''
-          }
-        }
-      }
-    }
+          script {
+            def fullWebImageName = "${ECR_REPOSITORY_WEB}:${IMAGE_TAG}"
+            def fullAppImageName = "${ECR_REPOSITORY_APP}:${IMAGE_TAG}"
+            sh """
+              docker tag ${WEB_IMAGE_NAME}:latest ${fullWebImageName}
+              docker push ${fullWebImageName}
 
-    stage('Tag and Push To DockerHub') {
-      when {
-        expression { !autoCancelled }
-      }
-      steps {
-        container('docker') {
-           script {
-             def fullWebImageName = "alexb853/${env.WEB_IMAGE_NAME}:${env.IMAGE_TAG}"
-             def fullAppImageName = "alexb853/${env.APP_IMAGE_NAME}:${env.IMAGE_TAG}"
-             sh """
-                docker tag ${WEB_IMAGE_NAME}:latest ${fullWebImageName}
-                docker push ${fullWebImageName}
-
-                docker tag ${APP_IMAGE_NAME}:latest ${fullAppImageName}
-                docker push ${fullAppImageName}
+              docker tag ${APP_IMAGE_NAME}:latest ${fullAppImageName}
+              docker push ${fullAppImageName}
             """
-            }
+          }
         }
       }
     }
@@ -145,8 +133,8 @@ pipeline {
               git checkout main
               git config --global user.email "alexb853@gmail.com"
               git config --global user.name "alexb853"
-              sed -i 's|image: alexb853/web-image:.*|image: alexb853/web-image:${IMAGE_TAG}|g' k8s/web/web-deployment.yaml
-              sed -i 's|image: alexb853/python-app-image:.*|image: alexb853/python-app-image:${IMAGE_TAG}|g' k8s/app/app-deployment.yaml
+              sed -i 's|image: alexb853/web-image:.*|image: ${ECR_REPOSITORY_WEB}:${IMAGE_TAG}|g' k8s/web/web-deployment.yaml
+              sed -i 's|image: alexb853/python-app-image:.*|image: ${ECR_REPOSITORY_APP}:${IMAGE_TAG}|g' k8s/app/app-deployment.yaml
               git add k8s/web/web-deployment.yaml
               git add k8s/app/app-deployment.yaml
               git commit -m "Update image to ${IMAGE_TAG} [ci skip]"
