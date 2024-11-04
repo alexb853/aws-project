@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-pod
+  namespace: default
+spec:
+  serviceAccountName: my-service-account
+  containers:
+    - name: my-app
+      image: my-app-image
+      env:                   # Correctly place env here
+        - name: AWS_REGION
+          value: eu-north-1  # Update this to your desired region
+      volumeMounts:
+        - name: secrets-store-inline
+          mountPath: /mnt/secrets
+  volumes:
+    - name: secrets-store-inline
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: aws-secrets
