@@ -1,7 +1,7 @@
 def autoCancelled = false
 
 pipeline {
-  agent none
+  agent any
 
   parameters {
     choice(name: 'AGENT_TYPE', choices: ['kubernetes-pods', 'ec2'], description: 'Select the Jenkins Agent to run the pipeline.')
