@@ -1,7 +1,7 @@
 def autoCancelled = false
 
 pipeline {
-  agent any
+  agent none  // No global agent for the entire pipeline
 
   parameters {
     choice(name: 'AGENT_TYPE', choices: ['kubernetes-pods', 'ec2'], description: 'Select the Jenkins Agent to run the pipeline.')
@@ -28,43 +28,51 @@ pipeline {
   }
 
   stages {
-    stage('Setup Agent') {
+    stage('Setup Agent - Kubernetes') {
       agent {
-        if (params.AGENT_TYPE == 'kubernetes-pods') {
-          kubernetes {
-            yaml '''
-              apiVersion: v1
-              kind: Pod
-              metadata:
-                namespace: alexb-jenkins
-              spec:
-                containers:
-                - name: jenkins-agent
-                  image: mecodia/jenkins-kubectl:latest
-                  command:
-                  - cat
-                  tty: true
-                - name: docker
-                  image: docker:latest
-                  command:
-                  - cat
-                  tty: true
-                  volumeMounts:
-                   - mountPath: /var/run/docker.sock
-                     name: docker-sock
-                volumes:
-                - name: docker-sock
-                  hostPath:
-                    path: /var/run/docker.sock
-            '''
-          }
-        } else {
-          label 'ec2-fleet'
+        kubernetes {
+          yaml '''
+            apiVersion: v1
+            kind: Pod
+            metadata:
+              namespace: alexb-jenkins
+            spec:
+              containers:
+              - name: jenkins-agent
+                image: mecodia/jenkins-kubectl:latest
+                command:
+                - cat
+                tty: true
+              - name: docker
+                image: docker:latest
+                command:
+                - cat
+                tty: true
+                volumeMounts:
+                 - mountPath: /var/run/docker.sock
+                   name: docker-sock
+              volumes:
+              - name: docker-sock
+                hostPath:
+                  path: /var/run/docker.sock
+          '''
         }
       }
-
+      when {
+        expression { params.AGENT_TYPE == 'kubernetes-pods' }
+      }
       steps {
-        echo "Running on ${params.AGENT_TYPE} agent."
+        echo "Running on Kubernetes agent."
+      }
+    }
+
+    stage('Setup Agent - EC2') {
+      agent { label 'ec2-fleet' }
+      when {
+        expression { params.AGENT_TYPE == 'ec2' }
+      }
+      steps {
+        echo "Running on EC2 agent."
       }
     }
 
