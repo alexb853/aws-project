@@ -59,7 +59,7 @@ pipeline {
             '''
           }
         } else {
-          label 'ec2'
+          label 'ec2-fleet'
         }
       }
 
