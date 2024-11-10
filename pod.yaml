@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: app-pod
-  namespace: default
+  namespace: alexb-jenkins
 spec:
   serviceAccountName: my-service-account
   containers:
