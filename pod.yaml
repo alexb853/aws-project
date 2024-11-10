@@ -8,9 +8,9 @@ spec:
   containers:
     - name: my-app
       image: my-app-image
-      env:                   # Correctly place env here
+      env:
         - name: AWS_REGION
-          value: eu-north-1  # Update this to your desired region
+          value: eu-north-1
       volumeMounts:
         - name: secrets-store-inline
           mountPath: /mnt/secrets
