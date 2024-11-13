@@ -13,12 +13,12 @@ pipeline {
     DOCKER_COMPOSE_FILE = 'docker-compose.yml'
     BUILD_DATE = new Date().format('yyyyMMdd-HHmmss')
     IMAGE_TAG = "v1.0-${BUILD_NUMBER}-${BUILD_DATE}"
-    AWS_ACCOUNT_ID = 'YOUR_AWS_ACCOUNT_ID'
-    AWS_REGION = 'YOUR_AWS_REGION'
+    AWS_ACCOUNT_ID = '023196572641'
+    AWS_REGION = 'eu-nurth-1'
     ECR_REPOSITORY_APP = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/python-app-repo"
     ECR_REPOSITORY_WEB = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/web-app-repo"
     GIT_CREDENTIALS_ID = 'github'
-    AWS_CREDENTIALS_ID = 'aws-ecr-credentials'  // Assuming you have configured AWS credentials in Jenkins
+    AWS_CREDENTIALS_ID = 'aws-jenkins'
   }
 
   options {
