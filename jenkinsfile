@@ -20,7 +20,7 @@ pipeline {
     GIT_CREDENTIALS_ID = 'github'
     AWS_CREDENTIALS_ID = 'aws-jenkins'
     KUBE_NAMESPACE = 'demo-app'
-    HELM_CHART_PATH = 'C:\Users\Alex\PycharmProjects\ProjectA\aws-project\chart.yaml'
+    HELM_CHART_PATH = 'C:/Users/Alex/PycharmProjects/ProjectA/aws-project/chart.yaml'
   }
 
   options {
