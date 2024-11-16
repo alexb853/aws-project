@@ -1,10 +1,10 @@
 def autoCancelled = false
 
 pipeline {
-  agent none  // No global agent for the entire pipeline
+  agent { label 'ec2-fleet' }  // Default agent to run the pipeline
 
   parameters {
-    choice(name: 'AGENT_TYPE', choices: ['kubernetes-pods', 'ec2'], description: 'Select the Jenkins Agent to run the pipeline.')
+    choice(name: 'AGENT_TYPE', choices: ['ec2'], description: 'Jenkins Agent to run the pipeline.')
   }
 
   environment {
@@ -19,6 +19,8 @@ pipeline {
     ECR_REPOSITORY_WEB = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/web-app-repo"
     GIT_CREDENTIALS_ID = 'github'
     AWS_CREDENTIALS_ID = 'aws-jenkins'
+    KUBE_NAMESPACE = 'demo-app'
+    HELM_CHART_PATH = 'C:\Users\Alex\PycharmProjects\ProjectA\aws-project\chart.yaml'
   }
 
   options {
@@ -28,54 +30,6 @@ pipeline {
   }
 
   stages {
-    stage('Setup Agent - Kubernetes') {
-      agent {
-        kubernetes {
-          yaml '''
-            apiVersion: v1
-            kind: Pod
-            metadata:
-              namespace: alexb-jenkins
-            spec:
-              containers:
-              - name: jenkins-agent
-                image: mecodia/jenkins-kubectl:latest
-                command:
-                - cat
-                tty: true
-              - name: docker
-                image: docker:latest
-                command:
-                - cat
-                tty: true
-                volumeMounts:
-                 - mountPath: /var/run/docker.sock
-                   name: docker-sock
-              volumes:
-              - name: docker-sock
-                hostPath:
-                  path: /var/run/docker.sock
-          '''
-        }
-      }
-      when {
-        expression { params.AGENT_TYPE == 'kubernetes-pods' }
-      }
-      steps {
-        echo "Running on Kubernetes agent."
-      }
-    }
-
-    stage('Setup Agent - EC2') {
-      agent { label 'ec2-fleet' }
-      when {
-        expression { params.AGENT_TYPE == 'ec2' }
-      }
-      steps {
-        echo "Running on EC2 agent."
-      }
-    }
-
     stage('Hello') {
       steps {
         wrap([$class: 'BuildUser']) {
@@ -86,12 +40,10 @@ pipeline {
 
     stage('Authenticate to AWS ECR') {
       steps {
-        container('docker') {
-          withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
-            sh '''
-              aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-            '''
-          }
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDENTIALS_ID}"]]) {
+          sh '''
+            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+          '''
         }
       }
     }
@@ -101,11 +53,9 @@ pipeline {
         expression { !autoCancelled }
       }
       steps {
-        container('docker') {
-          sh '''
-          /usr/local/bin/docker-compose -f ${DOCKER_COMPOSE_FILE} build
-          '''
-        }
+        sh '''
+        /usr/local/bin/docker-compose -f ${DOCKER_COMPOSE_FILE} build
+        '''
       }
     }
 
@@ -114,18 +64,16 @@ pipeline {
         expression { !autoCancelled }
       }
       steps {
-        container('docker') {
-          script {
-            def fullWebImageName = "${ECR_REPOSITORY_WEB}:${IMAGE_TAG}"
-            def fullAppImageName = "${ECR_REPOSITORY_APP}:${IMAGE_TAG}"
-            sh """
-              docker tag ${WEB_IMAGE_NAME}:latest ${fullWebImageName}
-              docker push ${fullWebImageName}
+        script {
+          def fullWebImageName = "${ECR_REPOSITORY_WEB}:${IMAGE_TAG}"
+          def fullAppImageName = "${ECR_REPOSITORY_APP}:${IMAGE_TAG}"
+          sh """
+            docker tag ${WEB_IMAGE_NAME}:latest ${fullWebImageName}
+            docker push ${fullWebImageName}
 
-              docker tag ${APP_IMAGE_NAME}:latest ${fullAppImageName}
-              docker push ${fullAppImageName}
-            """
-          }
+            docker tag ${APP_IMAGE_NAME}:latest ${fullAppImageName}
+            docker push ${fullAppImageName}
+          """
         }
       }
     }
@@ -150,6 +98,18 @@ pipeline {
             """
           }
         }
+      }
+    }
+
+    stage('Deploy Helm Chart') {
+      steps {
+        sh '''
+          helm upgrade --install my-helm-release ${HELM_CHART_PATH} \
+            --namespace ${KUBE_NAMESPACE} \
+            --create-namespace \
+            --set web.image=${ECR_REPOSITORY_WEB}:${IMAGE_TAG} \
+            --set app.image=${ECR_REPOSITORY_APP}:${IMAGE_TAG}
+        '''
       }
     }
   }
