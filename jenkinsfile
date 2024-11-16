@@ -19,7 +19,7 @@ pipeline {
     ECR_REPOSITORY_WEB = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/web-app-repo"
     GIT_CREDENTIALS_ID = 'github'
     AWS_CREDENTIALS_ID = 'aws-jenkins'
-    KUBE_NAMESPACE = 'demo-app'
+    KUBE_NAMESPACE = 'alexb-jenkins'
     HELM_CHART_PATH = 'C:/Users/Alex/PycharmProjects/ProjectA/aws-project/chart.yaml'
   }
 
